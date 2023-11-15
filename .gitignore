@@ -130,3 +130,6 @@ dmypy.json
 
 # others
 .DS_Store
+
+# pretrained model checkpoints
+*.pt
