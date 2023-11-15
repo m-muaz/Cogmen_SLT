@@ -130,3 +130,9 @@ dmypy.json
 
 # others
 .DS_Store
+
+# ignore the work_dirs
+work_dirs/
+
+# ignore checkpoints of pretrained models
+*.pt

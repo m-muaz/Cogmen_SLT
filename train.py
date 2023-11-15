@@ -96,7 +96,8 @@ def main(args):
     checkpoint = {
         "best_dev_f1": ret[0],
         "best_epoch": ret[1],
-        "best_state": ret[2],
+        "state_dict": ret[2],
+        "args": args,
     }
     torch.save(checkpoint, model_file)
 
