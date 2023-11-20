@@ -35,7 +35,7 @@ class Optim:
         if sch == "reduceLR":
             sched = lr_scheduler.ReduceLROnPlateau(self.optimizer, "min")
         elif sch == "expLR":
-            sched = ExponentialLR(self.optimizer, gamma=0.9)
+            sched = lr_scheduler.ExponentialLR(self.optimizer, gamma=0.9)
         return sched
 
     def step(self):

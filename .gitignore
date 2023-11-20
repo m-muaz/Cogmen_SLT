@@ -136,3 +136,6 @@ work_dirs/
 
 # ignore checkpoints of pretrained models
 *.pt
+
+# ignore .vscode folder
+.vscode/

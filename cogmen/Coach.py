@@ -57,7 +57,7 @@ class Coach:
     def load_ckpt(self, ckpt):
         self.best_dev_f1 = ckpt["best_dev_f1"]
         self.best_epoch = ckpt["best_epoch"]
-        self.best_state = ckpt["best_state"]
+        self.best_state = ckpt["state_dict"]
         self.model.load_state_dict(self.best_state)
         print("Loaded best model.....")
 
@@ -146,12 +146,30 @@ class Coach:
         self.trainset.shuffle()
         for idx in tqdm(range(len(self.trainset)), desc="train epoch {}".format(epoch)):
             self.model.zero_grad()
-            data = self.trainset[idx]
-            for k, v in data.items():
-                if not k == "utterance_texts":
-                    data[k] = v.to(self.args.device)
+            # * generate batch for teacher data
+            if "student_modality" in self.args.__dict__:
+                self.trainset._update_modalities(self.args.modalities)
+                teacher_data = self.trainset[idx]
+                for k, v in teacher_data.items():
+                    if not k == "utterance_texts":
+                        teacher_data[k] = v.to(self.args.device)
 
-            nll = self.model.get_loss(data)
+                # * generate batch for student model
+                self.trainset._update_modalities(self.args.student_modality)
+                data = self.trainset[idx]
+                for k, v in data.items():
+                    if not k == "utterance_texts":
+                        data[k] = v.to(self.args.device) 
+
+                nll = self.model.get_loss(data, teacher_data)
+            else:
+               # * generate batch for student model (this means we are training teacher)
+                data = self.trainset[idx]
+                for k, v in data.items():
+                    if not k == "utterance_texts":
+                        data[k] = v.to(self.args.device) 
+
+                nll = self.model.get_loss(data) 
             epoch_loss += nll.item()
             nll.backward()
             self.opt.step()
