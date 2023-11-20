@@ -114,6 +114,8 @@ class COGMEN(nn.Module):
 
         if teacher_embeddings is not None:
             L_contrast = self.triplet_loss(graph_out, teacher_embeddings)
+        else:
+            L_contrast = None
 
         if self.concat_gin_gout:
             L_pred = self.clf.get_loss(
@@ -128,7 +130,9 @@ class COGMEN(nn.Module):
             
         if teacher_embeddings is not None: # * i.e. during training
             loss = self.alpha_l_contrast * L_contrast + self.alpha_l_pred * L_pred
-        return loss
+        else:
+            loss = L_pred
+        return loss, L_contrast, L_pred
     
     def set_teacher_emb(self, new_data):
         self.teacher = new_data

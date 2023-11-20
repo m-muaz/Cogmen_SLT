@@ -139,3 +139,7 @@ work_dirs/
 
 # ignore .vscode folder
 .vscode/
+
+# ignore tensorboard logs
+tensorboard_logdir/
+runs/

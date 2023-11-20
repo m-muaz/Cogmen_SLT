@@ -144,6 +144,8 @@ def speech_cogmen_parser():
 
     # others
     parser.add_argument("--seed", type=int, default=24, help="Random seed.")
+    # Logging
+    ## Comet
     parser.add_argument(
         "--log_in_comet",
         action="store_true",
@@ -160,6 +162,21 @@ def speech_cogmen_parser():
         type=str,
         help="comet comet_workspace, required for logging experiments on comet.ml",
     )
+
+    ## tensorboard logging
+    parser.add_argument(
+            "--log_in_tensorboard",
+            action="store_true",
+            default=False,
+            help="Logs the experiment data to tensorboard (Locally)",
+    ) 
+    parser.add_argument(
+        "--tb_log_dir",
+        type=str,
+        default="./tensorboard_logdir",
+        help="Directory to store tensorboard logs",
+    )
+
 
     parser.add_argument("--use_pe_in_seqcontext", action="store_true", default=False)
     parser.add_argument("--tuning", action="store_true", default=False)

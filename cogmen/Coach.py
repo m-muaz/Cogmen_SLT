@@ -1,15 +1,21 @@
 import copy
 import time
 
+import os
 import numpy as np
 from numpy.core import overrides
 import torch
 from tqdm import tqdm
 from sklearn import metrics
+import matplotlib.pyplot as plt
+
+from custom.utils import check_dir
 
 import cogmen
 
 log = cogmen.utils.get_logger()
+
+from tensorboardX import SummaryWriter
 
 
 class Coach:
@@ -53,6 +59,31 @@ class Coach:
         self.best_dev_f1 = None
         self.best_epoch = None
         self.best_state = None
+        
+        # * create a epoch tracker for evaluation
+        self.epoch_tracker_dev = 0
+        self.epoch_tracker_test = 0
+
+        # * Create a tensorboard summary writer
+        if self.args.log_in_tensorboard:
+            # if there is nothing in side tb_log_dir then create exp run with name
+            # ex_name_i where i is the next available number
+            check_dir(self.args.tb_log_dir)
+            list_tb_runs = os.listdir(self.args.tb_log_dir)
+            tb_exp_run = None
+            if len(list_tb_runs) == 0:
+                tb_exp_run = self.args.ex_name+"_1"
+            else:
+                i = 1
+                while True:
+                    if self.args.ex_name + str(i) in list_tb_runs:
+                        i += 1
+                    else:
+                        break
+                tb_exp_run = self.args.ex_name + str(i)
+            tb_exp_run = os.path.join(self.args.tb_log_dir, tb_exp_run)
+            self.writer = SummaryWriter(log_dir=tb_exp_run, flush_secs=30)
+
 
     def load_ckpt(self, ckpt):
         self.best_dev_f1 = ckpt["best_dev_f1"]
@@ -141,6 +172,8 @@ class Coach:
     def train_epoch(self, epoch):
         start_time = time.time()
         epoch_loss = 0
+        epoch_l_contrast=0
+        epoch_l_pred=0
         self.model.train()
 
         self.trainset.shuffle()
@@ -161,7 +194,7 @@ class Coach:
                     if not k == "utterance_texts":
                         data[k] = v.to(self.args.device) 
 
-                nll = self.model.get_loss(data, teacher_data)
+                nll, l_contrast, l_pred = self.model.get_loss(data, teacher_data)
             else:
                # * generate batch for student model (this means we are training teacher)
                 data = self.trainset[idx]
@@ -169,8 +202,11 @@ class Coach:
                     if not k == "utterance_texts":
                         data[k] = v.to(self.args.device) 
 
-                nll = self.model.get_loss(data) 
+                nll, l_contrast, l_pred = self.model.get_loss(data) 
             epoch_loss += nll.item()
+            epoch_l_contrast += l_contrast.item()
+            epoch_l_pred += l_pred.item()
+
             nll.backward()
             self.opt.step()
 
@@ -180,6 +216,11 @@ class Coach:
             "[Epoch %d] [Loss: %f] [Time: %f]"
             % (epoch, epoch_loss, end_time - start_time)
         )
+        # * log losses to tensorboard
+        if self.writer is not None:
+            self.writer.add_scalar("Loss/train_overall", epoch_loss, epoch)
+            self.writer.add_scalar("Loss/train_contrast", epoch_l_contrast, epoch)
+            self.writer.add_scalar("Loss/train_pred", epoch_l_pred, epoch)
         return epoch_loss
 
     def evaluate(self, test=False):
@@ -197,7 +238,7 @@ class Coach:
                         data[k] = v.to(self.args.device)
                 y_hat = self.model(data)
                 preds.append(y_hat.detach().to("cpu"))
-                nll = self.model.get_loss(data)
+                nll, _, _ = self.model.get_loss(data)
                 dev_loss += nll.item()
 
             if self.args.dataset == "mosei" and self.args.emotion == "multilabel":
@@ -267,5 +308,50 @@ class Coach:
                         self.args.experiment.log_metric("surprise_f1", surprise)
                         self.args.experiment.log_metric("disgust_f1", disgust)
                         self.args.experiment.log_metric("fear_f1", fear)
+                
+            # * log to tensorboard
+            if self.writer is not None:
+                cm = metrics.confusion_matrix(golds, preds)
+                disp = metrics.ConfusionMatrixDisplay(confusion_matrix=cm)
+                disp.plot(values_format='d', cmap='Blues', ax=plt.gca())
 
+                # * log to tensorboard
+                is_test = 'test' if test else 'dev'
+                self.writer.add_figure('Confusion Matrix'+is_test, plt.gcf(), 
+                                    self.epoch_tracker_test+1 if test else self.epoch_tracker_dev+1)
+
+                # * log accuracy and f1 scores
+                if self.args.dataset == "mosei" and self.args.emotion == "multilabel":
+                    pass
+                else:
+                    # golds = torch.cat(golds, dim=-1).numpy()
+                    # preds = torch.cat(preds, dim=-1).numpy()
+
+                    # * compute f1 score for each class and weight by the class proportion
+                    f1_scores = metrics.f1_score(golds, preds, average=None)
+                    acc = metrics.accuracy_score(golds, preds)
+
+                    f1_dict = {}
+                    for class_label, f1_c in enumerate(f1_scores):
+                        f1_dict[str(class_label)] = f1_c
+
+                    self.writer.add_scalars(
+                        "F1_score/"+str(is_test)+"_classwise", f1_dict, 
+                        self.epoch_tracker_test+1 if test else self.epoch_tracker_dev+1
+                    )
+                    # * overall f1 score
+                    overall_f1_score = metrics.f1_score(golds, preds, average="weighted")
+                    self.writer.add_scalar("F1_score/"+str(is_test)+"overall", overall_f1_score, 
+                                    self.epoch_tracker_test+1 if test else self.epoch_tracker_dev+1)
+
+ 
+                    # * log accuracy
+                    self.writer.add_scalar("Accuracy/"+is_test, acc,
+                                    self.epoch_tracker_test+1 if test else self.epoch_tracker_dev+1)
+
+            # * update epoch tracker
+            if test:
+                self.epoch_tracker_test += 1
+            else:
+                self.epoch_tracker_dev += 1
         return f1, dev_loss
