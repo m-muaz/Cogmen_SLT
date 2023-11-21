@@ -1,7 +1,7 @@
 import copy
 import time
 
-from ..generate_masks import generate_training_mask, get_inference_mask
+from .generate_masks import generate_training_mask, get_inference_mask
 
 import numpy as np
 from numpy.core import overrides
