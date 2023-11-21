@@ -1,5 +1,6 @@
 from comet_ml import Experiment, Optimizer
 
+
 import argparse
 import torch
 import os
@@ -39,7 +40,7 @@ def func(experiment, trainset, devset, testset, model, opt, sched, args):
     return best_dev_f1
 
 
-def main(args):
+def main(args, mask_cfg):
     cogmen.utils.set_seed(args.seed)
 
     if args.emotion:
@@ -74,15 +75,15 @@ def main(args):
 
     log.debug("Building model...")
     if args.log_in_comet and not args.tuning:
-        model_file = "./model_checkpoints/" + str(args.experiment.get_key()) + ".pt"
+        model_file = "./Cogmen_SLT/model_checkpoints/" + str(args.experiment.get_key()) + ".pt"
     else:
-        model_file = "./model_checkpoints/model.pt"
+        model_file = "./Cogmen_SLT/model_checkpoints/model.pt"
     model = cogmen.COGMEN(args).to(args.device)
     opt = cogmen.Optim(args.learning_rate, args.max_grad_value, args.weight_decay)
     opt.set_parameters(model.parameters(), args.optimizer)
     sched = opt.get_scheduler(args.scheduler)
 
-    coach = cogmen.Coach(trainset, devset, testset, model, opt, sched, args)
+    coach = cogmen.Coach(trainset, devset, testset, model, opt, sched, mask_cfg, args)
     if not args.from_begin:
         ckpt = torch.load(model_file)
         coach.load_ckpt(ckpt)
@@ -102,6 +103,7 @@ def main(args):
 
 
 if __name__ == "__main__":
+    # python train.py --dataset="iemocap_4" --modalities="atv" --from_begin --epochs=55
 
     parser = argparse.ArgumentParser(description="train.py")
     parser.add_argument(
@@ -122,7 +124,7 @@ if __name__ == "__main__":
             -> label_to_idx in Coach.py """
 
     parser.add_argument(
-        "--data_dir_path", type=str, help="Dataset directory path", default="./data"
+        "--data_dir_path", type=str, help="Dataset directory path", default="./Cogmen_SLT/data"
     )
 
     # Training parameters
@@ -285,7 +287,20 @@ if __name__ == "__main__":
         },
     }
 
+    mask_cfg = {
+        'pmaf': 0.1,    # probability of fully masking audio
+        'pmvf': 0.1,    # probability of fully masking video
+        'pmar': 0.2,    # probability of masking an audio sample randomly
+        'pmvr': 0.2,    # probability of masking a video sample randomly
+        'aml': 1,       # audio mask length
+        'vml': 1,       # video mask length
+        'ail': args.dataset_embedding_dims[args.dataset]['a'],       # size of audio input 
+        'vil': args.dataset_embedding_dims[args.dataset]['v'],      # size of video input
+        'til': args.dataset_embedding_dims[args.dataset]['t'],
+    }
+
     log.debug(args)
+    log.debug(mask_cfg)
 
     # Create an experiment with your api key
     if args.log_in_comet and not args.tuning:
@@ -297,4 +312,4 @@ if __name__ == "__main__":
         args.experiment = experiment
         experiment.add_tag(args.tag)
 
-    main(args)
+    main(args, mask_cfg)

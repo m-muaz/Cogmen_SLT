@@ -1,6 +1,8 @@
 import copy
 import time
 
+from ..generate_masks import generate_training_mask, get_inference_mask
+
 import numpy as np
 from numpy.core import overrides
 import torch
@@ -13,7 +15,7 @@ log = cogmen.utils.get_logger()
 
 
 class Coach:
-    def __init__(self, trainset, devset, testset, model, opt, sched, args):
+    def __init__(self, trainset, devset, testset, model, opt, sched, mask_cfg, args):
         self.trainset = trainset
         self.devset = devset
         self.testset = testset
@@ -21,6 +23,7 @@ class Coach:
         self.opt = opt
         self.scheduler = sched
         self.args = args
+        self.mask_cfg = mask_cfg
         self.dataset_label_dict = {
             "iemocap": {"hap": 0, "sad": 1, "neu": 2, "ang": 3, "exc": 4, "fru": 5},
             "iemocap_4": {"hap": 0, "sad": 1, "neu": 2, "ang": 3},
@@ -147,9 +150,16 @@ class Coach:
         for idx in tqdm(range(len(self.trainset)), desc="train epoch {}".format(epoch)):
             self.model.zero_grad()
             data = self.trainset[idx]
+
+            input_mask = generate_training_mask(self.mask_cfg)
+
             for k, v in data.items():
                 if not k == "utterance_texts":
-                    data[k] = v.to(self.args.device)
+                    if k == "input_tensor":
+                        masked = (v*input_mask).type(v.dtype)
+                        data[k] = masked.to(self.args.device)
+                    else:
+                        data[k] = v.to(self.args.device)
 
             nll = self.model.get_loss(data)
             epoch_loss += nll.item()
@@ -173,10 +183,17 @@ class Coach:
             preds = []
             for idx in tqdm(range(len(dataset)), desc="test" if test else "dev"):
                 data = dataset[idx]
+
+                input_mask = get_inference_mask(self.mask_cfg)
+
                 golds.append(data["label_tensor"])
                 for k, v in data.items():
                     if not k == "utterance_texts":
-                        data[k] = v.to(self.args.device)
+                        if k == "input_tensor":
+                            masked = (v*input_mask).type(v.dtype)
+                            data[k] = masked.to(self.args.device)
+                        else:
+                            data[k] = v.to(self.args.device)
                 y_hat = self.model(data)
                 preds.append(y_hat.detach().to("cpu"))
                 nll = self.model.get_loss(data)

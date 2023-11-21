@@ -12,6 +12,9 @@ def generate_training_mask(cfg):
 
     audio_input_length = cfg['ail']
     video_input_length = cfg['vil']
+    #text_input_length = cfg['til']
+
+    #text_mask = np.ones(text_input_length)
 
     p = np.random.random()
 
@@ -55,16 +58,20 @@ def generate_training_mask(cfg):
         audio_mask[audio_mask_ids] = 0
         video_mask[video_mask_ids] = 0
 
-    return np.concatenate([audio_mask,video_mask])
+    #return np.concatenate([audio_mask, text_mask, video_mask])
+    return np.concatenate([audio_mask, video_mask])
 
 def get_inference_mask(cfg):
-    audio_input_length = cfg.ail
-    video_input_length = cfg.vil
-    
+    audio_input_length = cfg['ail']
+    video_input_length = cfg['vil']
+    #text_input_length = cfg['til']
+
+    #text_mask = np.ones(text_input_length)
     audio_mask = np.ones(audio_input_length)
     video_mask = np.zeros(video_input_length)
 
-    return np.concatenate([audio_mask,video_mask])
+    #return np.concatenate([audio_mask, text_mask, video_mask])
+    return np.concatenate([audio_mask, video_mask])
 
 """
 if __name__ == '__main__':
