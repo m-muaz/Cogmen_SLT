@@ -119,12 +119,20 @@ def main(args):
     log.info("Start training...")
     ret = coach.train()
 
+    # Test after training before saving
+    dash_line = ">"*70
+    log.info(dash_line + "\n")
+    log.info("Testing after training...")
+    coach.evaluate(test=True)
+
     # Save.
     checkpoint = {
         "best_dev_f1": ret[0],
         "best_epoch": ret[1],
         "state_dict": ret[2],
-        "args": args,
+        "dev_f1s": ret[4],
+        "test_f1s": ret[5],
+        "args": args.__dict__,
     }
     torch.save(checkpoint, model_file)
 

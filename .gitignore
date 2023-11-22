@@ -143,3 +143,6 @@ work_dirs/
 # ignore tensorboard logs
 tensorboard_logdir/
 runs/
+
+# ignore teh script logs
+script_logs/

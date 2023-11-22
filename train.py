@@ -76,7 +76,22 @@ def main(args):
     if args.log_in_comet and not args.tuning:
         model_file = "./model_checkpoints/" + str(args.experiment.get_key()) + ".pt"
     else:
-        model_file = "./model_checkpoints/model.pt"
+        print("In else statement")
+        model_dir = os.listdir("./model_checkpoints")
+        # model_name should be Cogmen_<modalities>_i.pt where i is the next available number
+        # for example Cogmen_atv_2.pt if Cogmen_atv_1.pt already exists
+        model_name = "Cogmen_" + args.modalities + "_"
+        # generate the next available number
+        model_num = 1
+        while True:
+            if model_name + str(model_num) + ".pt" in model_dir:
+                print("in if statement")
+                model_num += 1
+            else:
+                break
+        model_name = model_name + str(model_num) + ".pt"
+        print("Model name to be saved : ", model_name)
+        model_file = "./model_checkpoints/" + str(model_name)
     model = cogmen.COGMEN(args).to(args.device)
     opt = cogmen.Optim(args.learning_rate, args.max_grad_value, args.weight_decay)
     opt.set_parameters(model.parameters(), args.optimizer)
@@ -92,11 +107,19 @@ def main(args):
     log.info("Start training...")
     ret = coach.train()
 
+    # Test after training before saving
+    dash_line = ">"*70
+    log.info(dash_line + "\n")
+    log.info("Testing after training...")
+    coach.evaluate(test=True)
+
     # Save.
     checkpoint = {
         "best_dev_f1": ret[0],
         "best_epoch": ret[1],
         "state_dict": ret[2],
+        "dev_f1s": ret[4],
+        "test_f1s": ret[5],
         "args": args,
     }
     torch.save(checkpoint, model_file)
@@ -250,9 +273,28 @@ if __name__ == "__main__":
         help="comet comet_workspace, required for logging experiments on comet.ml",
     )
 
+    ## tensorboard logging
+    parser.add_argument(
+            "--log_in_tensorboard",
+            action="store_true",
+            default=False,
+            help="Logs the experiment data to tensorboard (Locally)",
+    ) 
+    parser.add_argument(
+        "--tb_log_dir",
+        type=str,
+        default="./tensorboard_logdir",
+        help="Directory to store tensorboard logs",
+    )
+
     parser.add_argument("--use_pe_in_seqcontext", action="store_true", default=False)
     parser.add_argument("--tuning", action="store_true", default=False)
     parser.add_argument("--tag", type=str, default="hyperparameters_opt")
+
+    # Experiment details
+    parser.add_argument("--res_dir", type=str, default="./work_dirs", help="Directory to store results")
+    parser.add_argument("--ex_name", type=str, default="cogmen_avt", help="Experiment name")
+    parser.add_argument("--exp_mode", type=str, default="train", help="Experiment mode: train/eval")
 
     args = parser.parse_args()
 

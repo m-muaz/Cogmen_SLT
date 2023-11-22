@@ -65,7 +65,7 @@ class Coach:
         self.epoch_tracker_test = 0
 
         # * Create a tensorboard summary writer
-        if self.args.log_in_tensorboard:
+        if "log_in_tensorboard" in self.args.__dict__ and self.args.log_in_tensorboard:
             # if there is nothing in side tb_log_dir then create exp run with name
             # ex_name_i where i is the next available number
             check_dir(self.args.tb_log_dir)
@@ -83,6 +83,8 @@ class Coach:
                 tb_exp_run = self.args.ex_name + str(i)
             tb_exp_run = os.path.join(self.args.tb_log_dir, tb_exp_run)
             self.writer = SummaryWriter(log_dir=tb_exp_run, flush_secs=30)
+        else:
+            self.writer = None
 
 
     def load_ckpt(self, ckpt):
@@ -180,6 +182,7 @@ class Coach:
         for idx in tqdm(range(len(self.trainset)), desc="train epoch {}".format(epoch)):
             self.model.zero_grad()
             # * generate batch for teacher data
+            l_contrast, l_pred = None, None
             if "student_modality" in self.args.__dict__:
                 self.trainset._update_modalities(self.args.modalities)
                 teacher_data = self.trainset[idx]
@@ -202,10 +205,12 @@ class Coach:
                     if not k == "utterance_texts":
                         data[k] = v.to(self.args.device) 
 
-                nll, l_contrast, l_pred = self.model.get_loss(data) 
+                nll = self.model.get_loss(data) 
             epoch_loss += nll.item()
-            epoch_l_contrast += l_contrast.item()
-            epoch_l_pred += l_pred.item()
+            if l_contrast is not None:
+                epoch_l_contrast += l_contrast.item()
+            if l_pred is not None:
+                epoch_l_pred += l_pred.item()
 
             nll.backward()
             self.opt.step()
@@ -238,7 +243,13 @@ class Coach:
                         data[k] = v.to(self.args.device)
                 y_hat = self.model(data)
                 preds.append(y_hat.detach().to("cpu"))
-                nll, _, _ = self.model.get_loss(data)
+                returned_losses = self.model.get_loss(data)
+                # print("Returned losses: ", returned_losses)
+                if isinstance(returned_losses, tuple):
+                    nll, _, _ = returned_losses
+                else:
+                    nll = returned_losses
+                # nll, _, _ = self.model.get_loss(data)
                 dev_loss += nll.item()
 
             if self.args.dataset == "mosei" and self.args.emotion == "multilabel":
@@ -311,7 +322,23 @@ class Coach:
                 
             # * log to tensorboard
             if self.writer is not None:
-                cm = metrics.confusion_matrix(golds, preds)
+                # convert gold labels to string using the mappiong
+                # make new dict with key as index and value as emotion
+                new_dict = {}
+                for key, value in self.label_to_idx.items():
+                    new_dict[value] = key
+                
+                gold_emotion = []
+                for gold in golds:
+                    gold_emotion.append(new_dict[gold])
+                golds = np.array(gold_emotion)
+
+                preds_emotion = []
+                for pred in preds:
+                    preds_emotion.append(new_dict[pred])
+                preds = np.array(preds_emotion)
+
+                cm = metrics.confusion_matrix(gold_emotion, preds_emotion)
                 disp = metrics.ConfusionMatrixDisplay(confusion_matrix=cm)
                 disp.plot(values_format='d', cmap='Blues', ax=plt.gca())
 
