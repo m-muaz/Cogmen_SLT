@@ -337,9 +337,9 @@ class Coach:
                 for pred in preds:
                     preds_emotion.append(new_dict[pred])
                 preds = np.array(preds_emotion)
-
+                
                 cm = metrics.confusion_matrix(gold_emotion, preds_emotion)
-                disp = metrics.ConfusionMatrixDisplay(confusion_matrix=cm)
+                disp = metrics.ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=list(self.label_to_idx.keys()))
                 disp.plot(values_format='d', cmap='Blues', ax=plt.gca())
 
                 # * log to tensorboard

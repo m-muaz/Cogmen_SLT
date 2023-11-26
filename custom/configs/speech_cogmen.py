@@ -15,3 +15,4 @@ teacher_model = "Cogmen_av_2"
 # tensorboard
 log_in_tensorboard=True
 tb_log_dir = "tensorboard_logdir"
+ex_name="Cogmen_a_iemocap_4_"
