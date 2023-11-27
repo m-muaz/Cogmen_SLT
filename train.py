@@ -1,5 +1,6 @@
 from comet_ml import Experiment, Optimizer
 
+#from .generate_masks import generate_training_mask, get_inference_mask
 
 import argparse
 import torch
@@ -288,15 +289,15 @@ if __name__ == "__main__":
     }
 
     mask_cfg = {
-        'pmaf': 0.1,    # probability of fully masking audio
-        'pmvf': 0.1,    # probability of fully masking video
-        'pmar': 0.2,    # probability of masking an audio sample randomly
-        'pmvr': 0.2,    # probability of masking a video sample randomly
+        'n_mask': 0.4,#0.1
+        'pmaf': 0.0,#0.3    # probability of fully masking audio
+        'pmvf': 0.0,#0.3    # probability of fully masking video
+        'pmar': 0.2,#0.2    # probability of masking an audio sample randomly
+        'pmvr': 0.0,#0.2    # probability of masking a video sample randomly
         'aml': 1,       # audio mask length
         'vml': 1,       # video mask length
         'ail': args.dataset_embedding_dims[args.dataset]['a'],       # size of audio input 
-        'vil': args.dataset_embedding_dims[args.dataset]['v'],      # size of video input
-        'til': args.dataset_embedding_dims[args.dataset]['t'],
+        'vil': 0#args.dataset_embedding_dims[args.dataset]['v'],      # size of video input
     }
 
     log.debug(args)

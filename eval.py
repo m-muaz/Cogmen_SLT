@@ -4,9 +4,14 @@ import argparse
 import torch
 import os
 
+#from .generate_masks import get_inference_mask
+#from .cogmen.generate_masks import get_inference_mask
+
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+#import matplotlib.pyplot as plt
+#import seaborn as sns
+
+from sklearn.metrics import confusion_matrix
 
 from sklearn import metrics
 from tqdm import tqdm
@@ -17,15 +22,31 @@ log = cogmen.utils.get_logger()
 
 
 def load_pkl(file):
+    #print('Opening checkpoint file:', file)
     with open(file, "rb") as f:
         return pickle.load(f)
 
+def get_inference_mask(cfg):
+    audio_input_length = cfg['ail']
+    video_input_length = cfg['vil']
+    #text_input_length = cfg['til']
+
+    #text_mask = np.ones(text_input_length)
+    audio_mask = np.ones(audio_input_length)
+    if cfg['v_mask']:
+        video_mask = np.zeros(video_input_length)
+    else:
+        video_mask = np.ones(video_input_length)
+
+    #return np.concatenate([audio_mask, text_mask, video_mask])
+    return np.concatenate([audio_mask, video_mask])
 
 def main(args):
-    data = load_pkl(f"data/{args.dataset}/data_{args.dataset}.pkl")
-
+    data = load_pkl(f"Cogmen_SLT/data/{args.dataset}/data_{args.dataset}.pkl")
+    
+    print('Opening checkpoint file:',str(args.dataset)+"_best_dev_f1_model_"+str(args.modalities)+".pt")
     model_dict = torch.load(
-        "model_checkpoints/"
+        "Cogmen_SLT/model_checkpoints/"
         + str(args.dataset)
         + "_best_dev_f1_model_"
         + str(args.modalities)
@@ -42,9 +63,22 @@ def main(args):
         for idx in tqdm(range(len(testset)), desc="test" if test else "dev"):
             data = testset[idx]
             golds.append(data["label_tensor"])
+
+            mask_cfg = {
+                    'vil':0,#512,
+                    'ail':100,
+                    'v_mask':True,
+            }
+
+            input_mask = get_inference_mask(mask_cfg)
+
             for k, v in data.items():
                 if not k == "utterance_texts":
-                    data[k] = v.to(stored_args.device)
+                    if k == 'input_tensor':
+                        masked = (v*input_mask).type(v.dtype)
+                        data[k] = masked.to(stored_args.device)
+                    else:
+                        data[k] = v.to(stored_args.device)
             y_hat = model(data)
             preds.append(y_hat.detach().to("cpu"))
 
@@ -57,6 +91,7 @@ def main(args):
             golds = torch.cat(golds, dim=-1).numpy()
             preds = torch.cat(preds, dim=-1).numpy()
             f1 = metrics.f1_score(golds, preds, average="weighted")
+            cm = confusion_matrix(golds, preds)
 
         if test:
             print(metrics.classification_report(golds, preds, digits=4))
@@ -81,6 +116,7 @@ def main(args):
                 }
 
             print(f"F1 Score: {f1}")
+            print(cm)
 
 
 if __name__ == "__main__":
@@ -96,7 +132,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--data_dir_path", type=str, help="Dataset directory path", default="./data"
+        "--data_dir_path", type=str, help="Dataset directory path", default="./Cogmen_SLT/data"
     )
 
     parser.add_argument("--device", type=str, default="cpu", help="Computing device.")
@@ -110,7 +146,7 @@ if __name__ == "__main__":
         type=str,
         default="atv",
         # required=True,
-        choices=["a", "at", "atv"],
+        choices=["a", "av", "at", "atv"],
         help="Modalities",
     )
 
