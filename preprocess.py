@@ -13,6 +13,122 @@ import cogmen
 
 log = cogmen.utils.get_logger()
 
+def get_iemocap_hubert_features():
+    cogmen.utils.set_seed(args.seed)
+
+    if args.dataset == "iemocap":
+        (
+            video_ids,
+            video_speakers,
+            video_labels,
+            video_text,
+            video_audio,
+            video_visual,
+            video_sentence,
+            trainVids,
+            test_vids,
+        ) = pickle.load(
+            open("./data/iemocap/IEMOCAP_features.pkl", "rb"), encoding="latin1"
+        )
+    elif args.dataset == "iemocap_4":
+        (
+            video_ids,
+            video_speakers,
+            video_labels,
+            video_text,
+            video_audio1,
+            video_visual,
+            video_sentence,
+            trainVids,
+            test_vids,
+        ) = pickle.load(
+            open("./data/iemocap_4/IEMOCAP_features_4.pkl", "rb"), encoding="latin1"
+        )
+
+
+        video_ids,video_labels,video_audio = pickle.load(open("./data/iemocap_4/hubert_iemocap_4_features.pkl", "rb"), encoding="latin1")
+    
+    incorrect_vids = [] 
+    for vid in video_audio.keys():
+        a = len(video_audio1[vid])
+        b= len(video_audio[vid])
+        if a!=b:
+            incorrect_vids.append(vid)
+
+        video_audio[vid] = [item[0].detach().numpy() for item in video_audio[vid]]
+    #print("incorrect VIDS:",incorrect_vids)
+    trainVids = [x for x in trainVids if x not in incorrect_vids]
+    test_vids = [x for x in test_vids if x not in incorrect_vids]
+
+    train, dev, test = [], [], []
+    dev_size = int(len(trainVids) * 0.1)
+    train_vids, dev_vids = trainVids[dev_size:], trainVids[:dev_size]
+    #print("after video_ids:",len(video_ids)) #["forders","folders",...]
+    #print("video_speakers:",len(video_speakers)) #"fodler:['M','F'/...]"
+
+    #print("video_labels:",video_labels["Ses02F_script01_3"]) #"fodler:[1,2...]"
+    #print("video_audio:",video_audio["Ses02F_script01_3"]) #"fodler:[[1,..],[2,...]...]"
+    #print("video_audio_for_folder:",video_audio.shape)
+    #print("label_audio_for_folder:",video_labels)
+
+    #print("video_audio_for_file:",len(video_audio["Ses02F_script01_3"][0]))
+
+    print("length trainVids:",len(train_vids)) #["forders","folders",...]
+    print("len test vids:",len(test_vids)) #["forders","folders",...]
+    print("len dev vids:",len(dev_vids)) #["forders","folders",...]
+    
+    #print("loading the pickle file:",len(pickle.load(open("./data/iemocap_4/IEMOCAP_features_4.pkl", "rb"), encoding="latin1")))
+    #video_speakers=[]
+    #video_text = []
+    #video_visual = []
+    #video_sentence = []
+    for vid in tqdm(train_vids, desc="train"):
+        
+
+        train.append(
+            cogmen.Sample(
+                vid,
+                video_speakers[vid],
+                video_labels[vid],
+                video_text[vid],
+                video_audio[vid],
+                video_visual[vid],
+                video_sentence[vid],
+            )
+        )
+    for vid in tqdm(dev_vids, desc="dev"):
+        dev.append(
+            cogmen.Sample(
+                vid,
+                video_speakers[vid],
+                video_labels[vid],
+                video_text[vid],
+                video_audio[vid],
+                video_visual[vid],
+                video_sentence[vid],
+            )
+        )
+    for vid in tqdm(test_vids, desc="test"):
+        test.append(
+            cogmen.Sample(
+                vid,
+                video_speakers[vid],
+                video_labels[vid],
+                video_text[vid],
+                video_audio[vid],
+                video_visual[vid],
+                video_sentence[vid],
+            )
+        )
+    log.info("train vids:")
+    log.info(sorted(train_vids))
+    log.info("dev vids:")
+    log.info(sorted(dev_vids))
+    log.info("test vids:")
+    log.info(sorted(test_vids))
+
+    return train, dev, test
+
 
 def get_iemocap():
     cogmen.utils.set_seed(args.seed)
@@ -46,6 +162,10 @@ def get_iemocap():
             open("./data/iemocap_4/IEMOCAP_features_4.pkl", "rb"), encoding="latin1"
         )
 
+    #incorrect_vids=['Ses01F_impro03', 'Ses01F_impro06', 'Ses01F_impro07', 'Ses01M_impro03', 'Ses01M_impro07', 'Ses02F_impro03', 'Ses02M_impro03', 'Ses03F_impro02', 'Ses03F_impro03', 'Ses03F_impro04', 'Ses03F_impro07', 'Ses03M_impro02', 'Ses03M_impro03', 'Ses03M_impro05a', 'Ses03M_impro07', 'Ses05F_impro07']
+    trainVids = [x for x in trainVids if x not in incorrect_vids]
+    test_vids = [x for x in test_vids if x not in incorrect_vids]
+    
     train, dev, test = [], [], []
     dev_size = int(len(trainVids) * 0.1)
     train_vids, dev_vids = trainVids[dev_size:], trainVids[:dev_size]
@@ -86,6 +206,7 @@ def get_iemocap():
                 video_sentence[vid],
             )
         )
+        
     log.info("train vids:")
     log.info(sorted(train_vids))
     log.info("dev vids:")
@@ -505,9 +626,13 @@ def main(args):
         data = {"train": train, "dev": dev, "test": test}
         cogmen.utils.save_pkl(data, "./data/iemocap/data_iemocap.pkl")
     if args.dataset == "iemocap_4" and args.split_utterances == -1:
-        train, dev, test = get_iemocap()
+        train, dev, test = get_iemocap() #get_iemocap_hubert_features()#
+        #train, dev, test = get_iemocap_hubert_features()#
+
         data = {"train": train, "dev": dev, "test": test}
-        cogmen.utils.save_pkl(data, "./data/iemocap_4/data_iemocap_4.pkl")
+        #cogmen.utils.save_pkl(data, "./data/iemocap_4/data_iemocap_4.pkl")
+        cogmen.utils.save_pkl(data, "./data/iemocap_4/data_iemocap_4_hubert.pkl")
+
     if args.dataset == "iemocap_4" and args.split_utterances != -1:
         train, dev, test = get_iemocap_split(args.split_utterances)
         data = {"train": train, "dev": dev, "test": test}

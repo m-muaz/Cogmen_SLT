@@ -132,7 +132,7 @@ for category, audio_meta_4 in grouped_df:
 #         audio_data = pickle.load(f2)
 
 data_to_save = [video_ids,video_labels,video_audio]
-file_path = 'hubert_iemocap_4_features.pkl'
+file_path = './data/iemocap_4/hubert_iemocap_4_features.pkl'
 with open(file_path, 'wb') as file:
     pickle.dump(data_to_save, file)
 
