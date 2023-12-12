@@ -49,9 +49,9 @@ linear_projection = nn.Linear(hidden_reduced_size, reduced_size)
 
 video_ids = []
 
-file_path = 'hubert_iemocap_4_features_audio.pkl'
-file_path_label = 'hubert_iemocap_4_features_label.pkl'
-file_path_vids = 'hubert_iemocap_4_features_vids.pkl'
+file_path = './data/iemocap_4/hubert_iemocap_4_features_audio.pkl'
+file_path_label = './data/iemocap_4/hubert_iemocap_4_features_label.pkl'
+file_path_vids = './data/iemocap_4/hubert_iemocap_4_features_vids.pkl'
 
 
 
